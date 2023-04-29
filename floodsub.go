@@ -32,6 +32,21 @@ type FloodSubRouter struct {
 	tracer    *pubsubTracer
 }
 
+func (fs *FloodSubRouter) AddTrustedPeer(id peer.ID) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (fs *FloodSubRouter) RemoveTrustedPeer(id peer.ID) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (fs *FloodSubRouter) GetTrustedPeers() []peer.ID {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (fs *FloodSubRouter) Protocols() []protocol.ID {
 	return fs.protocols
 }
