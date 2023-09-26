@@ -241,6 +241,7 @@ type Message struct {
 	ReceivedFrom  peer.ID
 	ValidatorData interface{}
 	Local         bool
+	NotifySubs    bool
 }
 
 func (m *Message) GetFrom() peer.ID {
@@ -1121,7 +1122,7 @@ func (p *PubSub) handleIncomingRPC(rpc *RPC) {
 				continue
 			}
 
-			p.PushMsg(&Message{pmsg, "", rpc.from, nil, false})
+			p.PushMsg(&Message{pmsg, "", rpc.from, nil, false, true})
 		}
 	}
 
@@ -1219,7 +1220,9 @@ func (p *PubSub) checkSigningPolicy(msg *Message) error {
 
 func (p *PubSub) publishMessage(msg *Message) {
 	p.tracer.DeliverMessage(msg)
-	p.notifySubs(msg)
+	if msg.NotifySubs {
+		p.notifySubs(msg)
+	}
 	if !msg.Local {
 		p.rt.Publish(msg)
 	}
