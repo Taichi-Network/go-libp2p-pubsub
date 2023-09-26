@@ -241,6 +241,7 @@ type Message struct {
 	ReceivedFrom  peer.ID
 	ValidatorData interface{}
 	Local         bool
+	NotifySubs    bool
 }
 
 func (m *Message) GetFrom() peer.ID {
@@ -651,7 +652,7 @@ func (p *PubSub) processLoop(ctx context.Context) {
 			p.handleIncomingRPC(rpc)
 
 		case msg := <-p.sendMsg:
-			p.publishMessage(msg)
+			p.PublishMessage(msg)
 
 		case req := <-p.addVal:
 			p.val.AddValidator(req)
@@ -1121,7 +1122,7 @@ func (p *PubSub) handleIncomingRPC(rpc *RPC) {
 				continue
 			}
 
-			p.pushMsg(&Message{pmsg, "", rpc.from, nil, false})
+			p.pushMsg(&Message{pmsg, "", rpc.from, nil, false, true})
 		}
 	}
 
@@ -1181,7 +1182,7 @@ func (p *PubSub) pushMsg(msg *Message) {
 	}
 
 	if p.markSeen(id) {
-		p.publishMessage(msg)
+		p.PublishMessage(msg)
 	}
 }
 
@@ -1217,9 +1218,11 @@ func (p *PubSub) checkSigningPolicy(msg *Message) error {
 	return nil
 }
 
-func (p *PubSub) publishMessage(msg *Message) {
+func (p *PubSub) PublishMessage(msg *Message) {
 	p.tracer.DeliverMessage(msg)
-	p.notifySubs(msg)
+	if msg.NotifySubs {
+		p.notifySubs(msg)
+	}
 	if !msg.Local {
 		p.rt.Publish(msg)
 	}
