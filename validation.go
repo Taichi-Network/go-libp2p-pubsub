@@ -292,7 +292,7 @@ func (v *validation) validateWorker() {
 // validate performs validation and only sends the message if all validators succeed
 func (v *validation) validate(vals []*validatorImpl, src peer.ID, msg *Message, synchronous bool) error {
 	// If signature verification is enabled, but signing is disabled,
-	// the Signature is required to be nil upon receiving the message in PubSub.pushMsg.
+	// the Signature is required to be nil upon receiving the message in PubSub.PushMsg.
 	if msg.Signature != nil {
 		if !v.validateSignature(msg) {
 			log.Debugf("message signature validation failed; dropping message from %s", src)

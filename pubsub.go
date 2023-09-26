@@ -1121,7 +1121,7 @@ func (p *PubSub) handleIncomingRPC(rpc *RPC) {
 				continue
 			}
 
-			p.pushMsg(&Message{pmsg, "", rpc.from, nil, false})
+			p.PushMsg(&Message{pmsg, "", rpc.from, nil, false})
 		}
 	}
 
@@ -1138,8 +1138,8 @@ func DefaultPeerFilter(pid peer.ID, topic string) bool {
 	return true
 }
 
-// pushMsg pushes a message performing validation as necessary
-func (p *PubSub) pushMsg(msg *Message) {
+// PushMsg pushes a message performing validation as necessary
+func (p *PubSub) PushMsg(msg *Message) {
 	src := msg.ReceivedFrom
 	// reject messages from blacklisted peers
 	if p.blacklist.Contains(src) {
