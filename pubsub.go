@@ -1121,7 +1121,7 @@ func (p *PubSub) handleIncomingRPC(rpc *RPC) {
 				continue
 			}
 
-			p.pushMsg(&Message{pmsg, "", rpc.from, nil, false})
+			p.PushMsg(&Message{pmsg, "", rpc.from, nil, false}, true)
 		}
 	}
 
@@ -1138,8 +1138,8 @@ func DefaultPeerFilter(pid peer.ID, topic string) bool {
 	return true
 }
 
-// pushMsg pushes a message performing validation as necessary
-func (p *PubSub) pushMsg(msg *Message) {
+// PushMsg pushes a message performing validation as necessary
+func (p *PubSub) PushMsg(msg *Message, notifySubs bool) {
 	src := msg.ReceivedFrom
 	// reject messages from blacklisted peers
 	if p.blacklist.Contains(src) {
@@ -1181,7 +1181,7 @@ func (p *PubSub) pushMsg(msg *Message) {
 	}
 
 	if p.markSeen(id) {
-		p.publishMessage(msg)
+		p.publishMessage(msg, notifySubs)
 	}
 }
 
@@ -1217,9 +1217,11 @@ func (p *PubSub) checkSigningPolicy(msg *Message) error {
 	return nil
 }
 
-func (p *PubSub) publishMessage(msg *Message) {
+func (p *PubSub) publishMessage(msg *Message, notifySubs bool) {
 	p.tracer.DeliverMessage(msg)
-	p.notifySubs(msg)
+	if notifySubs {
+		p.notifySubs(msg)
+	}
 	if !msg.Local {
 		p.rt.Publish(msg)
 	}
