@@ -36,6 +36,21 @@ type RandomSubRouter struct {
 	tracer *pubsubTracer
 }
 
+func (rs *RandomSubRouter) AddTrustedPeer(id peer.ID) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (rs *RandomSubRouter) RemoveTrustedPeer(id peer.ID) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (rs *RandomSubRouter) GetTrustedPeers() []peer.ID {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (rs *RandomSubRouter) Protocols() []protocol.ID {
 	return []protocol.ID{RandomSubID, FloodSubID}
 }

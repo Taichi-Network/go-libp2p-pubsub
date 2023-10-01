@@ -147,6 +147,10 @@ type PubSub struct {
 	blacklist     Blacklist
 	blacklistPeer chan peer.ID
 
+	// trusted peers related
+	handleTrustedPeer chan trustedPeerReq
+	getTrustedPeers   chan listTrustedPeerReq
+
 	peers map[peer.ID]chan *RPC
 
 	inboundStreamsMx sync.Mutex
@@ -196,6 +200,11 @@ type PubSubRouter interface {
 	// EnoughPeers returns whether the router needs more peers before it's ready to publish new records.
 	// Suggested (if greater than 0) is a suggested number of peers that the router should need.
 	EnoughPeers(topic string, suggested int) bool
+
+	AddTrustedPeer(peer.ID)
+	RemoveTrustedPeer(peer.ID)
+	GetTrustedPeers() []peer.ID
+
 	// AcceptFrom is invoked on any incoming message before pushing it to the validation pipeline
 	// or processing control information.
 	// Allows routers with internal scoring to vet peers before committing any processing resources
@@ -232,6 +241,7 @@ type Message struct {
 	ReceivedFrom  peer.ID
 	ValidatorData interface{}
 	Local         bool
+	NotifySubs    bool
 }
 
 func (m *Message) GetFrom() peer.ID {
@@ -294,6 +304,9 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 		idGen:                 newMsgIdGenerator(),
 		counter:               uint64(time.Now().UnixNano()),
 	}
+
+	ps.handleTrustedPeer = make(chan trustedPeerReq)
+	ps.getTrustedPeers = make(chan listTrustedPeerReq)
 
 	for _, opt := range opts {
 		err := opt(ps)
@@ -639,7 +652,7 @@ func (p *PubSub) processLoop(ctx context.Context) {
 			p.handleIncomingRPC(rpc)
 
 		case msg := <-p.sendMsg:
-			p.publishMessage(msg)
+			p.PublishMessage(msg)
 
 		case req := <-p.addVal:
 			p.val.AddValidator(req)
@@ -666,6 +679,18 @@ func (p *PubSub) processLoop(ctx context.Context) {
 				}
 				p.rt.RemovePeer(pid)
 			}
+
+		case req := <-p.handleTrustedPeer:
+			log.Infof("Trusted peer operation %v", req)
+			if req.add {
+				p.rt.AddTrustedPeer(req.peerID)
+			} else {
+				p.rt.RemoveTrustedPeer(req.peerID)
+			}
+
+		case req := <-p.getTrustedPeers:
+			peers := p.rt.GetTrustedPeers()
+			req.resp <- peers
 
 		case <-ctx.Done():
 			log.Info("pubsub processloop shutting down")
@@ -1097,7 +1122,7 @@ func (p *PubSub) handleIncomingRPC(rpc *RPC) {
 				continue
 			}
 
-			p.pushMsg(&Message{pmsg, "", rpc.from, nil, false})
+			p.pushMsg(&Message{pmsg, "", rpc.from, nil, false, true})
 		}
 	}
 
@@ -1157,7 +1182,7 @@ func (p *PubSub) pushMsg(msg *Message) {
 	}
 
 	if p.markSeen(id) {
-		p.publishMessage(msg)
+		p.PublishMessage(msg)
 	}
 }
 
@@ -1193,9 +1218,11 @@ func (p *PubSub) checkSigningPolicy(msg *Message) error {
 	return nil
 }
 
-func (p *PubSub) publishMessage(msg *Message) {
+func (p *PubSub) PublishMessage(msg *Message) {
 	p.tracer.DeliverMessage(msg)
-	p.notifySubs(msg)
+	if msg.NotifySubs {
+		p.notifySubs(msg)
+	}
 	if !msg.Local {
 		p.rt.Publish(msg)
 	}
@@ -1348,6 +1375,33 @@ func (p *PubSub) nextSeqno() []byte {
 type listPeerReq struct {
 	resp  chan []peer.ID
 	topic string
+}
+
+type trustedPeerReq struct {
+	peerID peer.ID
+	add    bool
+}
+
+type listTrustedPeerReq struct {
+	resp chan []peer.ID
+}
+
+func (p *PubSub) AddTrustedPeer(peerID peer.ID) {
+	p.handleTrustedPeer <- trustedPeerReq{peerID: peerID, add: true}
+}
+
+func (p *PubSub) RmTrustedPeer(peerID peer.ID) {
+	p.handleTrustedPeer <- trustedPeerReq{peerID: peerID, add: false}
+}
+
+func (p *PubSub) ListTrustedPeers() []peer.ID {
+	out := make(chan []peer.ID)
+	select {
+	case p.getTrustedPeers <- listTrustedPeerReq{resp: out}:
+	case <-p.ctx.Done():
+		return nil
+	}
+	return <-out
 }
 
 // ListPeers returns a list of peers we are connected to in the given topic.

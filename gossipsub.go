@@ -236,6 +236,7 @@ func DefaultGossipSubRouter(h host.Host) *GossipSubRouter {
 		feature:   GossipSubDefaultFeatures,
 		tagTracer: newTagTracer(h.ConnManager()),
 		params:    params,
+		direct:    make(map[peer.ID]struct{}),
 	}
 }
 
@@ -520,6 +521,24 @@ func (gs *GossipSubRouter) Attach(p *PubSub) {
 			}
 		}()
 	}
+}
+
+func (gs *GossipSubRouter) AddTrustedPeer(p peer.ID) {
+	gs.direct[p] = struct{}{}
+	gs.connect <- connectInfo{p: p}
+}
+
+func (gs *GossipSubRouter) RemoveTrustedPeer(p peer.ID) {
+	delete(gs.direct, p)
+	gs.RemovePeer(p)
+}
+
+func (gs *GossipSubRouter) GetTrustedPeers() []peer.ID {
+	var peers []peer.ID
+	for p := range gs.direct {
+		peers = append(peers, p)
+	}
+	return peers
 }
 
 func (gs *GossipSubRouter) AddPeer(p peer.ID, proto protocol.ID) {
